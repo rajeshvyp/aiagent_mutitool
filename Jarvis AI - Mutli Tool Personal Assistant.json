@@ -1,0 +1,441 @@
+{
+  "name": "Jarvis AI - Mutli Tool Personal Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message.text }}",
+        "options": {
+          "systemMessage": "=You are Jarvis, a reliable personal assistant running through Telegram and n8n.\n\nYour job is to understand the user's request, use the correct connected tools, and return accurate results.\n\n## 1. General rules\n- Answer ordinary questions directly.\n- Use tools only when appropriate.\n- Never invent tool results or claim success unless the relevant tool confirms it.\n- If a tool fails, stop and report the actual failure. Do not repeatedly call a failing tool.\n- Keep Telegram replies concise.\n- Persistent Memory is not connected. Use only the current conversation context.\n\nCURRENT DATE AND TIME: {{ $now.setZone('Europe/Paris').toFormat('yyyy-MM-dd HH:mm') }}\nTIMEZONE: Europe/Paris\n\nResolve relative dates using the current date and time above. Never invent dates or use dates from old examples.\n\n## 2. Strict tool routing\n- Amazon product requests: use Amazon Product Search.\n- Web research and current information: use Google Web Search.\n- Google Docs requests: use Google Docs tools only.\n- Calendar requests: use Google Calendar tools only.\n- Never call Calendar for a Google Docs request.\n- Never call Google Search or Amazon Search for a Google Docs-only request.\n- Never report results from an unrelated tool as the result of the current request.\n\n## 3. Google Docs\nWhen the user requests a new Google Doc:\n\n1. Extract the requested title and body content from the conversation.\n2. Call Create a document in Google Docs with the requested title.\n3. Inspect its actual result and obtain the document ID returned by the tool.\n4. Call Update a document in Google Docs to insert the requested body content into the document body.\n5. Pass the actual document ID from the creation result to the update operation.\n6. Verify that the update succeeds before claiming the document is complete.\n7. Return the document link if the tool provides one.\n\nImportant:\n- A document title is not a document ID.\n- Never pass a title as the Doc ID or URL.\n- Never invent or guess a document ID.\n- If the creation result does not provide a usable ID, stop and report the problem.\n- If creation succeeds but insertion fails, say the document was created but its content could not be inserted.\n- Do not repeatedly retry a failing operation.\n- Do not create a calendar event as a fallback.\n\nFor requests to edit an existing document, use the supplied document ID or URL. Ask for it if required and unavailable.\n\n## 4. Google Calendar\nUse Google Calendar only when the user explicitly asks to view, find, create, or modify calendar events.\n\n- Resolve relative dates using the current date and Europe/Paris timezone unless another timezone is specified.\n- Ask for clarification if essential event details are ambiguous or missing.\n- Use actual tool results.\n- Report success only after the relevant operation confirms success.\n- Never invent dates, times, locations, or event details.\n- Do not create duplicate events or modify/delete events without clear user intent.\n\n## 5. Amazon Product Search\nUse Amazon Product Search for Amazon products, prices, ratings, reviews, availability, and comparisons.\n\n- Present up to five relevant results.\n- Use only returned product information and URLs.\n- Respect the user's budget.\n- Never invent prices, ratings, reviews, discounts, or availability.\n\n## 6. Google Web Search\nUse Google Web Search for web research, current information, documentation, news, and verification.\n\n- Summarize up to five relevant results.\n- Include returned source titles and URLs.\n- Never invent sources or claim a search succeeded when it failed.\n\n## 7. Final response rules\nBefore replying, verify:\n- The correct tool was used.\n- The relevant operation actually succeeded.\n- The response matches the current request.\n- No unrelated tool result was substituted.\n- No document title was used as a document ID.\n\nUse concise Telegram-friendly replies. Be honest about errors and incomplete tasks.",
+          "maxIterations": 3
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -400,
+        -288
+      ],
+      "id": "97f23e95-e1cb-4720-bc1f-4a3bca7028f7",
+      "name": "Jarvis AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "maxRetries": 2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -736,
+        -144
+      ],
+      "id": "82815a61-91d5-4f9a-86e4-4b1d4096a886",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "O621DtkPrfIwx5fF",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Incoming Message').first().json.message.chat.id }}",
+        "text": "={{ $json.output }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        192,
+        -144
+      ],
+      "id": "2c7e1be1-a618-4c63-9e66-feeab153c1a5",
+      "name": "Send Text Reply",
+      "webhookId": "02e8d9b5-61c7-4720-819e-c7c58e071559",
+      "credentials": {
+        "telegramApi": {
+          "id": "y0dJEgQpJjONCzfw",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        -592,
+        -336
+      ],
+      "id": "e5baf33c-2dcd-49f6-8993-19ee81ae8733",
+      "name": "Incoming Message",
+      "webhookId": "a16b2a01-2148-4fc0-9b03-837aa20a1967",
+      "credentials": {
+        "telegramApi": {
+          "id": "y0dJEgQpJjONCzfw",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "amazon",
+        "k": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Search_Query__k_', ``, 'string') }}",
+        "amazon_domain": "amazon.in",
+        "additionalFields": {
+          "delivery_zip": "629154"
+        },
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApiTool",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -96
+      ],
+      "id": "b974799d-6599-44ad-8787-52b611ebef76",
+      "name": "Amazon Product Search",
+      "credentials": {
+        "serpApi": {
+          "id": "1griedtJolvaXIPx",
+          "name": "SerpApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "q": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Search_Query__q_', ``, 'string') }}",
+        "additionalFields": {},
+        "requestOptions": {}
+      },
+      "type": "n8n-nodes-serpapi.serpApiTool",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -80
+      ],
+      "id": "eae6e3f8-1503-4802-8a8c-cf10a7f82525",
+      "name": "Google Web Search",
+      "credentials": {
+        "serpApi": {
+          "id": "1griedtJolvaXIPx",
+          "name": "SerpApi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "Create a Google Calendar event when the user asks to schedule or add an event. Use the requested title, start time, end time, timezone, description, and location. If the date, time, or duration is unclear, ask the user for clarification before creating the event. Only report success when the event creation tool confirms success.",
+        "calendar": {
+          "__rl": true,
+          "value": "aiexplorer200@gmail.com",
+          "mode": "list",
+          "cachedResultName": "aiexplorer200@gmail.com"
+        },
+        "start": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Start', ``, 'string') }}",
+        "end": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('End', ``, 'string') }}",
+        "additionalFields": {
+          "description": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Description', ``, 'string') }}",
+          "location": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Location', ``, 'string') }}",
+          "summary": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Summary', ``, 'string') }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendarTool",
+      "typeVersion": 1.3,
+      "position": [
+        0,
+        -128
+      ],
+      "id": "ec5c4377-a3ad-41d3-a48b-580d0b45bbd6",
+      "name": "Google Calendar",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "Tp44BQeYLCeWr1ag",
+          "name": "Google Calendar account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentURL": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Doc_ID_or_URL', `Use the actual Google Docs document ID returned by the Create Document tool. Never use the document title as the ID. If no document ID is available, do not call this tool.`, 'string') }}",
+        "actionsUi": {
+          "actionFields": [
+            {
+              "action": "insert",
+              "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('actionFields0_Old_Text', `Insert text into an existing Google Docs document. Use the document ID and content supplied by the user or returned by the Google Docs Create Document tool. Insert the requested content into the document body. Do not claim success unless the operation succeeds.`, 'string') }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        -128,
+        -80
+      ],
+      "id": "fe305a5c-11ab-4af9-963f-1aea8a192c5b",
+      "name": "Update a document in Google Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "DHBSZcXdJpYPwOXB",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "folderId": "default",
+        "title": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Title', ``, 'string') }}"
+      },
+      "type": "n8n-nodes-base.googleDocsTool",
+      "typeVersion": 2,
+      "position": [
+        -256,
+        -32
+      ],
+      "id": "0c368858-ea9a-4423-991f-2e3108ad43ec",
+      "name": "Create a document in Google Docs",
+      "credentials": {
+        "googleDocsOAuth2Api": {
+          "id": "DHBSZcXdJpYPwOXB",
+          "name": "Google Docs account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "input": "={{ $('Jarvis AI Agent').item.json.output }}",
+        "options": {
+          "response_format": "opus"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        112,
+        -352
+      ],
+      "id": "cce0d1fb-67cd-4067-84e4-13bfb123f46d",
+      "name": "TTS",
+      "credentials": {
+        "openAiApi": {
+          "id": "O621DtkPrfIwx5fF",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "sendAudio",
+        "chatId": "={{ $('Incoming Message').item.json.message.chat.id }}",
+        "binaryData": true,
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        336,
+        -336
+      ],
+      "id": "9e38b251-6527-4ea0-9be7-13b82d2e3032",
+      "name": "Send Audio Reply",
+      "webhookId": "ac848ef9-6488-448b-ba61-5984d4f5b6e1",
+      "credentials": {
+        "telegramApi": {
+          "id": "y0dJEgQpJjONCzfw",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "ad95a0c5-9ee7-48eb-b65d-41e6cf83d55d",
+              "leftValue": "={{ $('Incoming Message').item.json.message.text }}",
+              "rightValue": "audio only",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -80,
+        -320
+      ],
+      "id": "9ab5679a-08a3-40ef-ba98-2168383ac933",
+      "name": "Condition- Audio only response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Jarvis AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Condition- Audio only response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Incoming Message": {
+      "main": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Amazon Product Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Web Search": {
+      "ai_tool": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Calendar": {
+      "ai_tool": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a document in Google Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a document in Google Docs": {
+      "ai_tool": [
+        [
+          {
+            "node": "Jarvis AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "TTS": {
+      "main": [
+        [
+          {
+            "node": "Send Audio Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Condition- Audio only response": {
+      "main": [
+        [
+          {
+            "node": "TTS",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Text Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "timezone": "Europe/Paris",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false
+  },
+  "versionId": "cec1459a-7f29-4e88-a325-c2f2c4a0ed27",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "3b1bd35a1537f7f3aa15d76f92d0c30ae60840374f9c0cdb745c0d240f056e9d"
+  },
+  "nodeGroups": [],
+  "id": "o44WVhFEv8hyVwah",
+  "tags": []
+}
